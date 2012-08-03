@@ -15,8 +15,8 @@ object RemoteAssets extends Controller {
 
   def at(url: String) = {
     Play.configuration.getString("contentURL") match {
-      case Some(contentURL) => contentURL + controllers.routes.ExternalAssets.at(url).url
-      case None => controllers.routes.ExternalAssets.at(url)
+      case Some(contentURL) => contentURL + controllers.routes.RemoteAssets.at(url).url
+      case None => controllers.routes.RemoteAssets.at(url)
     }
   }
 

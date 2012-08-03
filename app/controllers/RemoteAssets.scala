@@ -6,7 +6,7 @@ import play.api.Play
 import play.api.Play.current
 
 
-object ExternalAssets extends Controller {
+object RemoteAssets extends Controller {
 
   def at(path: String, file: String): Action[AnyContent] = Action { request =>
     val action: Action[AnyContent] = Assets.at(path, file)

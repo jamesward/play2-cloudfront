@@ -192,7 +192,7 @@ This simple little application is now ready for local testing.  Open it in your 
 
 You should see the Play logo fade in on top of a purple-ish background.  This page required a total of five HTTP requests:
 
-![Local HTTP Requests](images/localrequests.png)
+![Local HTTP Requests](https://raw.github.com/jamesward/play2-cloudfront/master/images/localrequests.png)
 
 Lets take this application and deploy it on the cloud with Heroku and then we will setup CloudFront to serve the static assets.
 
@@ -238,7 +238,7 @@ Heroku is a Cloud Application Platform that can run many different types of apps
 
 This time all five requests go to Heroku:
 
-![Local HTTP Requests](images/herokurequests.png)
+![Local HTTP Requests](https://raw.github.com/jamesward/play2-cloudfront/master/images/herokurequests.png)
 
 The requests take quite a bit longer than locally, in-part because the bits have a much larger distance to travel.  All of the requests except the index page (because it's dynamic) can be served from a CDN.  Now lets setup CloudFront to serve the static assets.
 
@@ -256,7 +256,7 @@ CloudFront has a very simple way to load static assets into it's CDN.  When a re
 5. In the `Origin Domain Name` field enter the domain name for your application on Heroku.  In my case it is: `peaceful-retreat-3158.herokuapp.com`
 6. Keep the other default values as-is and select `Continue`
 
-    ![CloudFront Setup](images/cloudfrontsetup.png)
+    ![CloudFront Setup](https://raw.github.com/jamesward/play2-cloudfront/master/images/cloudfrontsetup.png)
 
 7. Do the same for the next two steps (keep the defaults)
 8. Select `Create Distribution`
@@ -285,11 +285,11 @@ Now test out your application on Heroku in your browser:
 
 You should now see all four static asset requests going to CloudFront:
 
-![Heroku and CloudFront - Miss](images/herokucloudfrontmiss.png)
+![Heroku and CloudFront - Miss](https://raw.github.com/jamesward/play2-cloudfront/master/images/herokucloudfrontmiss.png)
 
 But as you can see they assets didn't load very quickly because the first request is a `Miss from cloudfront`.  Reload the page (clear your cache to avoid 304s) and you should see much faster responses:
 
-![Heroku and CloudFront - Hit](images/herokucloudfronthit.png)
+![Heroku and CloudFront - Hit](https://raw.github.com/jamesward/play2-cloudfront/master/images/herokucloudfronthit.png)
 
 And now your static assets are being edge cached!
 

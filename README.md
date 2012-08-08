@@ -52,139 +52,139 @@ Create a new Play 2 application:
 
 For this example we are going to load jQuery from a [WebJar](http://www.jamesward.com/2012/04/25/introducing-webjars-web-libraries-as-managed-dependencies) so you can remove the `play2-cloudfront/public/javascripts/jquery-1.7.1.min.js` file.  Now update the `play2-cloudfront/project/Build.scala` file to include a dependency on the jQuery WebJar and the WebJars repository:
 
-        import sbt._
-        import Keys._
-        import PlayProject._
-        
-        object ApplicationBuild extends Build {
-        
-            val appName         = "play2-cloudfront"
-            val appVersion      = "1.0-SNAPSHOT"
-        
-            val appDependencies = Seq(
-              "com.jquery" % "jquery" % "1.7.2-1"
-            )
-        
-            val main = PlayProject(appName, appVersion, appDependencies, mainLang = JAVA).settings(
-              resolvers += "webjars" at "http://webjars.github.com/m2"
-            )
-        
-        }
+    import sbt._
+    import Keys._
+    import PlayProject._
+    
+    object ApplicationBuild extends Build {
+    
+        val appName         = "play2-cloudfront"
+        val appVersion      = "1.0-SNAPSHOT"
+    
+        val appDependencies = Seq(
+          "com.jquery" % "jquery" % "1.7.2-1"
+        )
+    
+        val main = PlayProject(appName, appVersion, appDependencies, mainLang = JAVA).settings(
+          resolvers += "webjars" at "http://webjars.github.com/m2"
+        )
+    
+    }
 
 If you want to use IntelliJ IDEA or Eclipse then you can generate the project files.  From the command line within the `play2-cloudfront` directory, run either:
 
-        play idea
+    play idea
 
 Or:
 
-        play eclipsify
+    play eclipsify
 
 You can now start the Play server from the command line within the `play2-cloudfront` directory:
 
-        play ~run
+    play ~run
 
-You can verify that the Play server is running by opening the local documentation in your browser: [http://localhost:9000/@documentation](http://localhost:9000/@documentation)
+Verify that the Play server is running by opening the local documentation in your browser: [http://localhost:9000/@documentation](http://localhost:9000/@documentation)
 
 Play has a simple static asset controller that serves files from the classpath (any Jar dependency or source directory).  However, the [Assets Controller](http://www.playframework.org/documentation/api/2.0.2/scala/index.html#controllers.Assets$) doesn't provide a mechanism in its URL resolver (Play 2's reverse routing) to change the URL of the asset.  We will need this functionality later since loading assets from CloudFront requires using a different, non-relative, domain name.  To solve this we will create a new `RemoteAssets` controller that wraps the `Assets` controller and optionally adds a domain prefix in front of the resolved URLs.
 
 Create a new file named `app/controllers/RemoteAssets.scala` that contains:
 
-        package controllers
-        
-        import play.api.mvc._
-        import play.api.Play
-        import play.api.Play.current
-        import org.joda.time.format.{DateTimeFormat, DateTimeFormatter}
-        import org.joda.time.DateTimeZone
-        import scala.Some
-        
-        
-        object RemoteAssets extends Controller {
-        
-          private val timeZoneCode = "GMT"
-        
-          private val df: DateTimeFormatter =
-            DateTimeFormat.forPattern("EEE, dd MMM yyyy HH:mm:ss '"+timeZoneCode+"'").withLocale(java.util.Locale.ENGLISH).withZone(DateTimeZone.forID(timeZoneCode))
-        
-          type ResultWithHeaders = Result { def withHeaders(headers: (String, String)*): Result }
-        
-          def getAsset(path: String, file: String): Action[AnyContent] = Action { request =>
-            val action = Assets.at(path, file)
-            val result = action.apply(request)
-            val resultWithHeaders = result.asInstanceOf[ResultWithHeaders]
-            resultWithHeaders.withHeaders(DATE -> df.print({new java.util.Date}.getTime))
-          }
-        
-          def getUrl(file: String) = {
-            Play.configuration.getString("contenturl") match {
-              case Some(contentUrl) => contentUrl + controllers.routes.RemoteAssets.getAsset(file).url
-              case None => controllers.routes.RemoteAssets.getAsset(file)
-            }
-          }
-        
+    package controllers
+    
+    import play.api.mvc._
+    import play.api.Play
+    import play.api.Play.current
+    import org.joda.time.format.{DateTimeFormat, DateTimeFormatter}
+    import org.joda.time.DateTimeZone
+    import scala.Some
+    
+    
+    object RemoteAssets extends Controller {
+    
+      private val timeZoneCode = "GMT"
+    
+      private val df: DateTimeFormatter =
+        DateTimeFormat.forPattern("EEE, dd MMM yyyy HH:mm:ss '"+timeZoneCode+"'").withLocale(java.util.Locale.ENGLISH).withZone(DateTimeZone.forID(timeZoneCode))
+    
+      type ResultWithHeaders = Result { def withHeaders(headers: (String, String)*): Result }
+    
+      def getAsset(path: String, file: String): Action[AnyContent] = Action { request =>
+        val action = Assets.at(path, file)
+        val result = action.apply(request)
+        val resultWithHeaders = result.asInstanceOf[ResultWithHeaders]
+        resultWithHeaders.withHeaders(DATE -> df.print({new java.util.Date}.getTime))
+      }
+    
+      def getUrl(file: String) = {
+        Play.configuration.getString("contenturl") match {
+          case Some(contentUrl) => contentUrl + controllers.routes.RemoteAssets.getAsset(file).url
+          case None => controllers.routes.RemoteAssets.getAsset(file)
         }
+      }
+    
+    }
 
-This Scala class has a `getAsset` method that takes `path` and `file` parameters and returns the actual asset in the response.  A `Date` header is also added to the response headers.  The `getUrl` method takes a `file` parameter and returns a URL to the file.  That URL will be prefixed by a `contentUrl` if one is provided in the application's configuration.  To setup the configuration so that an `contentUrl` can be optionally provided, add the following to the `conf/application.conf` file:
+This Scala class has a `getAsset` method that takes `path` and `file` parameters and returns the actual asset in the response.  A `Date` header is also added to the response headers.  The `getUrl` method takes a `file` parameter and returns a URL to the file.  That URL will be prefixed by a `contentUrl` if one is provided in the application's configuration.  To setup the configuration so that a `contentUrl` can be optionally provided, add the following to the `conf/application.conf` file:
 
-        contenturl=${?CONTENT_URL}
+    contenturl=${?CONTENT_URL}
 
 If an environment variable named `CONTENT_URL` is provided then the `contenturl` configuration parameter is set.
 
 Now lets create and use some static content.  First lets write a little [CoffeeScript](http://jashkenas.github.com/coffee-script/) that will use jQuery to fade an image in.  This will help to illustrate how even compiled and minimized assets can be loaded from the CDN.  Create a new file named `app/assets/javascripts/index.coffee` containing:
 
-        $ ->
-          $("img").fadeIn()
+    $ ->
+      $("img").fadeIn()
 
 This simple script simply fades in all of the images on the page when the page has loaded.
 
 Also update the `public/stylesheets/main.css` file to give the web page a new background color:
 
-        body {
-            background-color: #ddddff;
-        }
+    body {
+        background-color: #ddddff;
+    }
 
 Now create a new server-side template that will load the stylesheet, jQuery (from the WebJar), the `index.coffee` script, and the `public/images/favicon.png` image.  Create a new file named `app/views/index.scala.html` containing:
 
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Play 2 with CloudFront</title>
-            <link type='text/css' rel='stylesheet' href='@RemoteAssets.getUrl("stylesheets/main.css")'/>
-            <script type='text/javascript' src='@RemoteAssets.getUrl("jquery.min.js")'></script>
-            <script type='text/javascript' src='@RemoteAssets.getUrl("javascripts/index.min.js")'></script>
-        </head>
-        <body>
-            <img src='@RemoteAssets.getUrl("images/favicon.png")' style="display: none;"/>
-        </body>
-        </html>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Play 2 with CloudFront</title>
+        <link type='text/css' rel='stylesheet' href='@RemoteAssets.getUrl("stylesheets/main.css")'/>
+        <script type='text/javascript' src='@RemoteAssets.getUrl("jquery.min.js")'></script>
+        <script type='text/javascript' src='@RemoteAssets.getUrl("javascripts/index.min.js")'></script>
+    </head>
+    <body>
+        <img src='@RemoteAssets.getUrl("images/favicon.png")' style="display: none;"/>
+    </body>
+    </html>
 
 Notice how the `getUrl` method in the `RemoteAssets` controller is used to get a URL for each asset.  Now we need a simple controller that will render the `index` template.  Create a new file named `app/controllers/Application.java` containing:
 
-        package controllers;
-        
-        
-        import play.mvc.Controller;
-        import play.mvc.Result;
-        
-        import views.html.index;
-        
-        public class Application extends Controller {
-          
-          public static Result index() {
-            return ok(index.render());
-          }
-          
-        }
+    package controllers;
+    
+    
+    import play.mvc.Controller;
+    import play.mvc.Result;
+    
+    import views.html.index;
+    
+    public class Application extends Controller {
+      
+      public static Result index() {
+        return ok(index.render());
+      }
+      
+    }
 
 This controller has a single method named `index` that just returns the rendered `index` template with a `200` HTTP status.
 
 The last thing to do is to create a mapping between HTTP request verbs & paths and the controller that serves the request.  Edit the `conf/routes` file and add the following:
 
-        # Home page
-        GET     /                           controllers.Application.index()
-        
-        # Map static resources from the /public folder to the /assets URL path
-        GET     /assets/*file               controllers.RemoteAssets.getAsset(path="/public", file)
+    # Home page
+    GET     /                           controllers.Application.index()
+    
+    # Map static resources from the /public folder to the /assets URL path
+    GET     /assets/*file               controllers.RemoteAssets.getAsset(path="/public", file)
 
 Now `GET` requests to `/` will be handled by the `controllers.Application.index` method and `GET` requests to `/assets/` will be handled by the `controllers.RemoteAssets.getAsset` method.
 
@@ -267,21 +267,21 @@ You can test the status of distribution by making a request for the `favicon.png
 
 The first time that request goes through, CloudFront will make a request back to the app on Heroku and then load the asset into the CDN.  If you examine the HTTP response headers on that request you will see:
  
-        X-Cache:Miss from cloudfront
+    X-Cache:Miss from cloudfront
 
 That indicates that the resource was not on the CDN.  A subsequent request should contain the following response header:
 
-        X-Cache:Hit from cloudfront
+    X-Cache:Hit from cloudfront
 
 That indicates that the resource was served from the CDN and there was no need to go back to the origin server.
 
 Now that the static assets are loadable via CloudFront lets tell the app on Heroku and the `RemoteAssets` controller to point to them.  Just set the `CONTENT_URL` environment variable on your application by running the following from the command line (make sure you replace the URL value with the one for the distribution you just created):
 
-        heroku config:add CONTENT_URL="http://d7471vfo50fqt.cloudfront.net"
+    heroku config:add CONTENT_URL="http://d7471vfo50fqt.cloudfront.net"
 
 Now test out your application on Heroku in your browser:
 
-        heroku open
+    heroku open
 
 You should now see all four static asset requests going to CloudFront:
 
@@ -295,7 +295,7 @@ And now your static assets are being edge cached!
 
 ## Learn More
 
-Using a CDN is step one of significantly speeding up your web applications but there is certainly more that you can do.  By default Play sets the expiration time of static assets to 1 hour (via the `Cache-Control` response header:
+Using a CDN is step one of significantly speeding up your web applications but there is certainly more that you can do.  By default Play sets the expiration time of static assets to 1 hour (via the `Cache-Control` response header):
 
     Cache-Control: max-age=3600
 
